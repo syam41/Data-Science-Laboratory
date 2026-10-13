@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 40 640 320" width="640" height="320" role="img" aria-label="CSV / JSON / EXCEL I/O">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3d444e"/>
+      <stop offset="0.55" stop-color="#2f353d"/>
+      <stop offset="1" stop-color="#1b1f25"/>
+    </linearGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect y="40" width="640" height="320" fill="url(#bg)"/>
+  <rect y="40" width="640" height="320" fill="url(#grid)"/>
+  <circle cx="560" cy="110" r="150" fill="#c9a227" fill-opacity="0.06"/>
+  <circle cx="70" cy="400" r="120" fill="#c9a227" fill-opacity="0.05"/>
+  <rect x="0" y="40" width="640" height="4" fill="#c9a227"/>
+  <text x="34" y="66" font-family="Segoe UI,Arial,sans-serif" font-size="15" fill="#a9b0b8" letter-spacing="1.8">CSV / JSON / EXCEL I/O</text>
+  <path d="M34 80h84" stroke="#c9a227" stroke-width="3" stroke-linecap="round"/>
+  <g transform="translate(0,-40)">
+  <rect x="132" y="146" width="88" height="34" rx="5" fill="#c9a227" fill-opacity="0.95"/><rect x="228" y="146" width="88" height="34" rx="5" fill="#c9a227" fill-opacity="0.95"/><rect x="324" y="146" width="88" height="34" rx="5" fill="#c9a227" fill-opacity="0.95"/><rect x="420" y="146" width="88" height="34" rx="5" fill="#c9a227" fill-opacity="0.95"/>
+  <rect x="132" y="188" width="88" height="34" rx="5" fill="#343a42" fill-opacity="0.85"/><rect x="228" y="188" width="88" height="34" rx="5" fill="#3d444e" fill-opacity="0.85"/><rect x="324" y="188" width="88" height="34" rx="5" fill="#343a42" fill-opacity="0.85"/><rect x="420" y="188" width="88" height="34" rx="5" fill="#3d444e" fill-opacity="0.85"/>
+  <rect x="132" y="230" width="88" height="34" rx="5" fill="#343a42" fill-opacity="0.85"/><rect x="228" y="230" width="88" height="34" rx="5" fill="#3d444e" fill-opacity="0.85"/><rect x="324" y="230" width="88" height="34" rx="5" fill="#343a42" fill-opacity="0.85"/><rect x="420" y="230" width="88" height="34" rx="5" fill="#3d444e" fill-opacity="0.85"/>
+  <rect x="132" y="272" width="88" height="34" rx="5" fill="#343a42" fill-opacity="0.85"/><rect x="228" y="272" width="88" height="34" rx="5" fill="#3d444e" fill-opacity="0.85"/><rect x="324" y="272" width="88" height="34" rx="5" fill="#343a42" fill-opacity="0.85"/><rect x="420" y="272" width="88" height="34" rx="5" fill="#3d444e" fill-opacity="0.85"/>
+  <path d="M168 318h56l18 18v58h-74z" fill="#3a6b57" stroke="#f7f8fa" stroke-opacity="0.45" stroke-width="2"/><path d="M224 318v18h18" fill="none" stroke="#f7f8fa" stroke-opacity="0.45" stroke-width="2"/><text x="205" y="380" font-family="Consolas,monospace" font-size="17" font-weight="700" fill="#f7f8fa" text-anchor="middle">CSV</text><path d="M282 318h56l18 18v58h-74z" fill="#7a6a3f" stroke="#f7f8fa" stroke-opacity="0.45" stroke-width="2"/><path d="M338 318v18h18" fill="none" stroke="#f7f8fa" stroke-opacity="0.45" stroke-width="2"/><text x="319" y="380" font-family="Consolas,monospace" font-size="17" font-weight="700" fill="#f7f8fa" text-anchor="middle">JSON</text><path d="M396 318h56l18 18v58h-74z" fill="#3a6b57" stroke="#f7f8fa" stroke-opacity="0.45" stroke-width="2"/><path d="M452 318v18h18" fill="none" stroke="#f7f8fa" stroke-opacity="0.45" stroke-width="2"/><text x="433" y="380" font-family="Consolas,monospace" font-size="17" font-weight="700" fill="#f7f8fa" text-anchor="middle">XLSX</text>
+  </g>
+</svg>

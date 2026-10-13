@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 40 640 320" width="640" height="320" role="img" aria-label="TIME SERIES / PERIODS">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3d444e"/>
+      <stop offset="0.55" stop-color="#2f353d"/>
+      <stop offset="1" stop-color="#1b1f25"/>
+    </linearGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect y="40" width="640" height="320" fill="url(#bg)"/>
+  <rect y="40" width="640" height="320" fill="url(#grid)"/>
+  <circle cx="560" cy="110" r="150" fill="#c9a227" fill-opacity="0.06"/>
+  <circle cx="70" cy="400" r="120" fill="#c9a227" fill-opacity="0.05"/>
+  <rect x="0" y="40" width="640" height="4" fill="#c9a227"/>
+  <text x="34" y="66" font-family="Segoe UI,Arial,sans-serif" font-size="15" fill="#a9b0b8" letter-spacing="1.8">TIME SERIES / PERIODS</text>
+  <path d="M34 80h84" stroke="#c9a227" stroke-width="3" stroke-linecap="round"/>
+  <g transform="translate(0,-40)">
+<path d="M232 340h368" stroke="#a9b0b8" stroke-opacity="0.55" stroke-width="2.5"/><path d="M232 340V152" stroke="#a9b0b8" stroke-opacity="0.55" stroke-width="2.5"/>
+  <polygon points="250,300 300,262 350,286 400,214 450,240 500,178 550,206 590,152 590,340 250,340" fill="#c9a227" fill-opacity="0.12"/>
+  <polyline points="250,300 300,262 350,286 400,214 450,240 500,178 550,206 590,152" fill="none" stroke="#c9a227" stroke-width="3.5" stroke-linejoin="round"/>
+  <circle cx="250" cy="300" r="5" fill="#f7f8fa"/><circle cx="300" cy="262" r="5" fill="#f7f8fa"/><circle cx="350" cy="286" r="5" fill="#f7f8fa"/><circle cx="400" cy="214" r="5" fill="#f7f8fa"/><circle cx="450" cy="240" r="5" fill="#f7f8fa"/><circle cx="500" cy="178" r="5" fill="#f7f8fa"/><circle cx="550" cy="206" r="5" fill="#f7f8fa"/><circle cx="590" cy="152" r="5" fill="#f7f8fa"/>
+  <text x="262" y="364" font-family="Consolas,monospace" font-size="14" fill="#a9b0b8" text-anchor="middle">Jan</text><text x="352" y="364" font-family="Consolas,monospace" font-size="14" fill="#a9b0b8" text-anchor="middle">Mar</text><text x="442" y="364" font-family="Consolas,monospace" font-size="14" fill="#a9b0b8" text-anchor="middle">May</text><text x="532" y="364" font-family="Consolas,monospace" font-size="14" fill="#a9b0b8" text-anchor="middle">Jul</text>
+  <text x="70" y="200" font-family="Consolas,monospace" font-size="22" fill="#c9a227">2024-01-01</text>
+  </g>
+</svg>

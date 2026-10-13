@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MBU · Data Science Digital Library</title>
+<meta name="description" content="MBU Data Science Digital Library — experiments, sub-experiments, videos, GitHub code, summaries, results and architecture diagrams.">
+<link rel="icon" href="images/mbu-logo.webp">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ================= HEADER ================= -->
+<header class="site-header">
+  <div class="header-inner">
+
+    <div class="brand">
+      <img src="images/mbu-logo.webp" alt="MBU Logo" class="brand-logo" width="56" height="56">
+      <div class="brand-text">
+        <strong>MBU &middot; Data Science Laboratory</strong>
+        <span>Digital Experiment Library</span>
+      </div>
+    </div>
+
+    <nav class="main-nav" aria-label="Main">
+      <button type="button" class="nav-btn active" data-page="home">HOME</button>
+      <button type="button" class="nav-btn" data-page="modules">MODULES</button>
+      <button type="button" class="nav-btn" data-page="tools">TOOLS</button>
+    </nav>
+
+    <div class="course-badge">
+      <span class="course-code">22DS102006</span>
+      <span class="course-dot">&middot;</span>
+      <span class="course-sec">DS-2</span>
+    </div>
+
+  </div>
+</header>
+
+<main>
+
+  <!-- ================= HERO ================= -->
+  <section class="hero" data-page-section="home">
+    <div class="hero-inner">
+      <h1 class="hero-title">
+        <span>DATA SCIENCE</span>
+        <span>DIGITAL LIBRARY</span>
+      </h1>
+      <p class="hero-sub">
+        A premium home for experiments, sub-experiments, videos, GitHub code,
+        summaries, results and architecture diagrams.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ STORY (left) + STUDENT PROFILE (right) ============ -->
+  <section class="intro" data-page-section="home">
+
+    <div class="intro-story">
+      <div class="story-head">
+        <h2>Data Science: From Data to Discovery</h2>
+        <p>
+          Data Science combines statistics, programming, machine learning and domain
+          knowledge to turn data into useful insights. This library organizes
+          practical experiments into a clear digital showcase.
+        </p>
+      </div>
+
+      <div class="story-points">
+        <article class="story-point">
+          <span class="point-index">01</span>
+          <div>
+            <h3>Understand Data</h3>
+            <p>Explore patterns, trends and relationships through analysis and visualization.</p>
+          </div>
+        </article>
+        <article class="story-point">
+          <span class="point-index">02</span>
+          <div>
+            <h3>Build Intelligence</h3>
+            <p>Use algorithms and machine learning to discover patterns and support decisions.</p>
+          </div>
+        </article>
+        <article class="story-point">
+          <span class="point-index">03</span>
+          <div>
+            <h3>Shape the Future</h3>
+            <p>Connect experiments, code and results to create practical data-driven solutions.</p>
+          </div>
+        </article>
+      </div>
+    </div>
+
+    <aside class="intro-profile">
+      <div class="profile-card">
+        <img src="images/student-profile.png" alt="Student Photograph" class="profile-photo" width="140" height="140"
+             title="Replace images/student-profile.png with your own photo (a square PNG works best)">
+
+        <div class="profile-info">
+          <p class="profile-label">Student Profile</p>
+
+          <div class="profile-row">
+            <span class="profile-key">Name</span>
+            <span class="profile-value">P. SYAM SANKAR</span>
+          </div>
+          <div class="profile-row">
+            <span class="profile-key">Student ID</span>
+            <span class="profile-value">24102A030086</span>
+          </div>
+          <div class="profile-row">
+            <span class="profile-key">Section</span>
+            <span class="profile-value">DS-2</span>
+          </div>
+          <div class="profile-row">
+            <span class="profile-key">Faculty</span>
+            <span class="profile-value">S. BOSUBABU SIR</span>
+          </div>
+          <div class="profile-row">
+            <span class="profile-key">Designation</span>
+            <span class="profile-value">ASSISTANT PROFESSOR</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+  </section>
+
+  <!-- ================= COLLECTION ================= -->
+  <section class="collection" id="collection" data-page-section="home">
+
+    <div class="collection-head">
+      <div>
+        <h2>Experiment Collection</h2>
+        <p class="collection-sub">Six showcase slots &middot; click Overview to explore</p>
+      </div>
+
+      <div class="toolbar">
+        <div class="search-box">
+          <input type="search" id="search" placeholder="Search experiments / sub-experiments" autocomplete="off">
+        </div>
+        <button type="button" id="addExperiment" class="btn-add">＋ ADD EXPERIMENT</button>
+      </div>
+    </div>
+
+    <div id="grid" class="grid"></div>
+
+    <div id="empty" class="empty" hidden>
+      <p>No experiment matches your search.</p>
+    </div>
+
+  </section>
+
+  <!-- ================= MODULES ================= -->
+  <section class="page" id="pageModules" data-page-section="modules" hidden>
+    <div class="page-head">
+      <p class="page-kicker">Course Structure</p>
+      <h1 class="page-title">DATA SCIENCE<br><span>MODULES</span></h1>
+      <p class="page-sub">
+        Five modules, each split into seven topics. Every module carries a description and
+        a short learning outcome so you know exactly what a topic is about before opening it.
+      </p>
+    </div>
+
+    <div class="module-grid" id="moduleGrid"></div>
+  </section>
+
+  <!-- ================= TOOLS ================= -->
+  <section class="page" id="pageTools" data-page-section="tools" hidden>
+    <div class="page-head">
+      <p class="page-kicker">Technology Stack</p>
+      <h1 class="page-title">TOOLS &amp;<br><span>SKILLS</span></h1>
+      <p class="page-sub">
+        Every skill used across this laboratory, with a short note on what it does and a
+        direct link to its official website.
+      </p>
+    </div>
+
+    <div class="tool-groups" id="toolGrid"></div>
+  </section>
+
+
+</main>
+
+<!-- ================= FOOTER ================= -->
+<footer class="site-footer">
+  <div class="footer-inner">
+    <p><strong>MBU &middot; Data Science Laboratory</strong> &mdash; Digital Experiment Library</p>
+    <p class="footer-meta">22DS102006 &middot; DS-2 &nbsp;|&nbsp; SYAM &middot; 24102A030086 &nbsp;|&nbsp; Faculty: BOSU BABU SIR</p>
+  </div>
+</footer>
+
+<!-- ================= MODAL ================= -->
+<div id="modal" class="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="detail">
+
+    <button type="button" id="closeModal" class="modal-close" aria-label="Close">&times;</button>
+
+    <div id="detail" class="modal-body"></div>
+
+  </div>
+</div>
+
+<!-- ================= TOAST ================= -->
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="course-data.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

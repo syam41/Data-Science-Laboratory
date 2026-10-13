@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 40 640 320" width="640" height="320" role="img" aria-label="EDA / REST API / SQL">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3d444e"/>
+      <stop offset="0.55" stop-color="#2f353d"/>
+      <stop offset="1" stop-color="#1b1f25"/>
+    </linearGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect y="40" width="640" height="320" fill="url(#bg)"/>
+  <rect y="40" width="640" height="320" fill="url(#grid)"/>
+  <circle cx="560" cy="110" r="150" fill="#c9a227" fill-opacity="0.06"/>
+  <circle cx="70" cy="400" r="120" fill="#c9a227" fill-opacity="0.05"/>
+  <rect x="0" y="40" width="640" height="4" fill="#c9a227"/>
+  <text x="34" y="66" font-family="Segoe UI,Arial,sans-serif" font-size="15" fill="#a9b0b8" letter-spacing="1.8">EDA / REST API / SQL</text>
+  <path d="M34 80h84" stroke="#c9a227" stroke-width="3" stroke-linecap="round"/>
+  <g transform="translate(0,-40)">
+<ellipse cx="228" cy="168" rx="66" ry="20" fill="#2b3138" stroke="#a9b0b8" stroke-opacity="0.55" stroke-width="2"/><path d="M162 168v104c0 11 30 20 66 20s66-9 66-20V168" fill="#2b3138" stroke="#a9b0b8" stroke-opacity="0.55" stroke-width="2"/><ellipse cx="228" cy="220" rx="66" ry="20" fill="none" stroke="#a9b0b8" stroke-opacity="0.4" stroke-width="2"/><ellipse cx="228" cy="272" rx="66" ry="20" fill="none" stroke="#a9b0b8" stroke-opacity="0.4" stroke-width="2"/>
+  <path d="M300 226h22" stroke="#c9a227" stroke-width="4"/><path d="M316 219l10 7-10 7z" fill="#c9a227"/>
+  <rect x="330" y="230" width="30" height="70" rx="4" fill="#a9b0b8" fill-opacity="0.9"/><rect x="376" y="182" width="30" height="118" rx="4" fill="#c9a227" fill-opacity="0.9"/><rect x="422" y="208" width="30" height="92" rx="4" fill="#a9b0b8" fill-opacity="0.9"/><rect x="468" y="154" width="30" height="146" rx="4" fill="#c9a227" fill-opacity="0.9"/><rect x="514" y="192" width="30" height="108" rx="4" fill="#a9b0b8" fill-opacity="0.9"/><rect x="560" y="140" width="30" height="160" rx="4" fill="#c9a227" fill-opacity="0.9"/>
+  </g>
+</svg>
