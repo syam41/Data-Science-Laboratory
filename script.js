@@ -1,4 +1,4 @@
-/* =========================================================
+﻿/* =========================================================
    MBU - Data Science Digital Library
    script.js
    -------------------------------------------------------------
@@ -3669,33 +3669,93 @@ Freq: 6h
 
 
 /* =========================================================
-   4. PAGES  -  HOME / MODULES / TOOLS
+   4. ROUTER + PAGES
+   -------------------------------------------------------------
+   The site is static, so routing runs on the hash. Every screen
+   is a real page - nothing opens in a popup any more.
+     #/home  #/experiments  #/modules  #/projects
+     #/resources  #/tools  #/lab
+     #/exp/3            experiment overview
+     #/sub/3/A          sub-experiment
+     #/module/2         module notes
+     #/topic/2/5        one topic
    ========================================================= */
-function currentPage() {
-    let active = "home";
-    document.querySelectorAll(".nav-btn").forEach(function (btn) {
-        if (btn.classList.contains("active")) active = btn.dataset.page;
-    });
-    return active;
+const PAGES = ["home", "experiments", "modules", "projects", "resources", "tools", "lab"];
+
+/* Navigates without reloading the page. */
+function go(path) {
+    const target = "#" + (path.charAt(0) === "/" ? path : "/" + path);
+    if (location.hash === target) renderRoute();
+    else location.hash = target;
 }
 
+/* Reads the hash and paints the matching screen. */
+function renderRoute() {
+    const parts = String(location.hash || "").replace(/^#\/?/, "").split("/").filter(Boolean);
+    const head = parts[0];
+
+    if (head === "exp") return openOverview(parts[1]);
+    if (head === "sub") return openSub(parts[1], parts[2]);
+    if (head === "module") return openModule(parts[1]);
+    if (head === "topic") return openTopic(parts[1], parts[2]);
+
+    showPage(PAGES.indexOf(head) === -1 ? "home" : head);
+}
+
+/* Shows one of the seven main pages. Passing null hides them all,
+   which is what happens while a detail screen is on screen. */
 function showPage(name) {
-    const page = name === "modules" ? "modules" : name === "tools" ? "tools" : "home";
-    const wanted = page === "home" ? "home" : page;
+    const page = PAGES.indexOf(name) === -1 ? null : name;
 
     document.querySelectorAll("[data-page-section]").forEach(function (section) {
-        const match = section.getAttribute("data-page-section") === wanted;
-        section.hidden = !match;
+        section.hidden = section.getAttribute("data-page-section") !== page;
     });
 
     document.querySelectorAll(".nav-btn").forEach(function (btn) {
-        btn.classList.toggle("active", btn.dataset.page === page);
+        btn.classList.toggle("active", Boolean(page) && btn.dataset.page === page);
     });
 
+    const view = document.getElementById("view");
+    if (view) view.hidden = page !== null;
+
+    scrollToTop();
+}
+
+function scrollToTop() {
     if (typeof window.scrollTo === "function") {
         try { window.scrollTo({ top: 0, behavior: "smooth" }); }
         catch (err) { /* older browsers only accept the short form */ }
     }
+}
+
+/* =========================================================
+   4b. FULL SCREEN DETAIL VIEW
+   -------------------------------------------------------------
+   Every experiment, sub-experiment, module and topic is painted
+   here, below a bar that always carries the way back.
+   ========================================================= */
+let viewReady = function () { };   /* replaced further down by the lab wiring */
+
+function renderView(html, options) {
+    const view = document.getElementById("view");
+    const body = document.getElementById("viewBody");
+    const crumb = document.getElementById("viewCrumb");
+    const jump = document.getElementById("viewJump");
+    const backText = document.getElementById("viewBackText");
+    if (!view || !body) return;
+
+    const opts = options || {};
+
+    body.innerHTML = html;
+    if (crumb) crumb.innerHTML = opts.crumb || "";
+    if (jump) jump.innerHTML = opts.jump || "";
+    if (backText) backText.textContent = opts.back || "Back";
+    view.setAttribute("data-back", opts.backTo || "");
+
+    showPage(null);
+    scrollToTop();
+    guardVideos();
+    viewReady();
 }
 
 /* ---------- MODULES page ---------- */
@@ -3704,6 +3764,8 @@ function moduleCardHtml(mod) {
         return "<li>" + escapeHtml(t.t) + "</li>";
     }).join("");
 
+    const notes = getModuleNotes(mod.no);
+
     return "" +
         '<article class="module-card">' +
         '   <p class="module-no">MODULE ' + escapeHtml(mod.no) + "</p>" +
@@ -3711,10 +3773,14 @@ function moduleCardHtml(mod) {
         '   <h3 class="module-title">' + escapeHtml(mod.title) + "</h3>" +
         '   <p class="module-desc">' + escapeHtml(mod.desc) + "</p>" +
         '   <p class="module-outcome">' + escapeHtml(mod.outcome) + "</p>" +
+        (notes.length
+            ? '   <p class="module-notes">' + notes.length + " long note" + (notes.length === 1 ? "" : "s") +
+              " with flowcharts</p>"
+            : "") +
         '   <ul class="module-topics">' + topics + "</ul>" +
         '   <div class="module-actions">' +
-        '       <button type="button" class="btn-overview" onclick="openModule(' + Number(mod.no) + ')">' +
-        "           View Topics <span class=\"btn-arrow\">&rarr;</span>" +
+        '       <button type="button" class="btn-overview" onclick="go(\'/module/' + Number(mod.no) + '\')">' +
+        "           Read Module <span class=\"btn-arrow\">&rarr;</span>" +
         "       </button>" +
         "   </div>" +
         "</article>";
@@ -3726,30 +3792,142 @@ function renderModules() {
     grid.innerHTML = modules.map(moduleCardHtml).join("");
 }
 
-/* ---------- module detail ---------- */
+/* ---------- module page (full screen) ---------- */
+function getModuleNotes(moduleNo) {
+    const notes = typeof moduleNotes === "undefined" ? [] : moduleNotes;
+    const found = notes.filter(function (n) { return String(n.module) === String(moduleNo); })[0];
+    return found ? found.pages || [] : [];
+}
+
+/* One long note: paragraphs, key points, a flowchart, an example
+   and the takeaways at the end. */
+function modulePageHtml(page, index, total) {
+    const body = (page.body || []).map(function (text) {
+        return "<p>" + escapeHtml(text) + "</p>";
+    }).join("");
+
+    const points = (page.points || []).length
+        ? '<div class="note-points">' +
+          (page.points || []).map(function (point) {
+              return '<p class="note-point"><span class="np-mark">&#9679;</span>' + escapeHtml(point) + "</p>";
+          }).join("") +
+          "</div>"
+        : "";
+
+    const flow = page.flow ? flowchartHtml(page.flow) : "";
+
+    const example = page.example ? "" +
+        '<div class="note-example">' +
+        '   <h4 class="note-example-title">' + escapeHtml(page.example.title || "Worked example") + "</h4>" +
+        '   <pre class="note-code"><code>' + escapeHtml(page.example.code || "") + "</code></pre>" +
+        (page.example.note ? '   <p class="note-example-note">' + escapeHtml(page.example.note) + "</p>" : "") +
+        "</div>"
+        : "";
+
+    const table = page.table ? tableHtml(page.table) : "";
+
+    const takeaways = (page.takeaways || []).length
+        ? '<div class="note-takeaways">' +
+          "   <h4>Takeaways</h4>" +
+          "   <ul>" +
+          (page.takeaways || []).map(function (t) { return "<li>" + escapeHtml(t) + "</li>"; }).join("") +
+          "   </ul>" +
+          "</div>"
+        : "";
+
+    return "" +
+        '<article class="note" id="note-' + (index + 1) + '">' +
+        '   <p class="note-kicker">Note ' + (index + 1) + " of " + total + "</p>" +
+        '   <h2 class="note-title">' + escapeHtml(page.title || "") + "</h2>" +
+        (page.lead ? '   <p class="note-lead">' + escapeHtml(page.lead) + "</p>" : "") +
+        '   <div class="note-body">' + body + "</div>" +
+        points + flow + table + example + takeaways +
+        "</article>";
+}
+
+/* Flowchart: numbered boxes joined by arrows, exactly in the order
+   the steps are listed in the data file. */
+function flowchartHtml(flow) {
+    const steps = (flow.steps || []).map(function (step, i) {
+        const label = typeof step === "string" ? step : step[0];
+        const tag = typeof step === "string" ? "" : step[1];
+        const note = typeof step === "string" ? "" : step[2];
+        const box = "" +
+            '<div class="flow-node">' +
+            '   <span class="flow-no">' + (i + 1) + "</span>" +
+            '   <span class="flow-label">' + escapeHtml(label) + "</span>" +
+            (tag ? '   <span class="flow-tag">' + escapeHtml(tag) + "</span>" : "") +
+            (note ? '   <span class="flow-note">' + escapeHtml(note) + "</span>" : "") +
+            "</div>";
+        if (i === 0) return box;
+        return '<span class="flow-arrow">&rarr;</span>' + box;
+    }).join("");
+
+    if (!steps) return "";
+
+    return "" +
+        '<div class="note-flow">' +
+        '   <h4 class="note-flow-title">' + escapeHtml(flow.title || "Flow") + "</h4>" +
+        '   <div class="flow">' + steps + "</div>" +
+        (flow.caption ? '   <p class="flow-caption">' + escapeHtml(flow.caption) + "</p>" : "") +
+        "</div>";
+}
+
+function tableHtml(table) {
+    const head = (table.head || []).map(function (cell) { return "<th>" + escapeHtml(cell) + "</th>"; }).join("");
+    const rows = (table.rows || []).map(function (row) {
+        return "<tr>" + row.map(function (cell) { return "<td>" + escapeHtml(cell) + "</td>"; }).join("") + "</tr>";
+    }).join("");
+
+    return "" +
+        '<div class="note-table">' +
+        '   <table><thead><tr>' + head + "</tr></thead><tbody>" + rows + "</tbody></table>" +
+        (table.caption ? '   <p class="flow-caption">' + escapeHtml(table.caption) + "</p>" : "") +
+        "</div>";
+}
+
+function moduleJumpHtml(list, found) {
+    const position = list.indexOf(found);
+    const prev = position > 0 ? list[position - 1] : null;
+    const next = position > -1 && position < list.length - 1 ? list[position + 1] : null;
+
+    return "" +
+        (prev ? '<button type="button" class="view-step" onclick="go(\'/module/' + prev.no + '\')">&larr; Module ' + escapeHtml(prev.no) + "</button>" : "") +
+        (next ? '<button type="button" class="view-step" onclick="go(\'/module/' + next.no + '\')">Module ' + escapeHtml(next.no) + " &rarr;</button>" : "");
+}
+
 function openModule(moduleNo) {
     const list = typeof modules === "undefined" ? [] : modules;
     const found = list.filter(function (m) { return Number(m.no) === Number(moduleNo); })[0];
     if (!found) {
         toast("That module is not available yet.");
-        return;
+        return go("/modules");
     }
 
+    /* the seven topics keep their original order */
     const items = found.topics.map(function (t, i) {
         return "" +
-            '<button type="button" class="topic-item" onclick="openTopic(' + Number(found.no) + ", " + (i + 1) + ')">' +
+            '<button type="button" class="topic-item" onclick="go(\'/topic/' + Number(found.no) + "/" + (i + 1) + '\')">' +
             '   <span class="topic-idx">TOPIC ' + (i + 1) + "</span>" +
             '   <span class="topic-name">' + escapeHtml(t.t) + "</span>" +
             "</button>";
     }).join("");
 
+    const notes = getModuleNotes(found.no);
+    const noteHtml = notes.length
+        ? '<div class="notes">' +
+          notes.map(function (page, i) { return modulePageHtml(page, i, notes.length); }).join("") +
+          "</div>"
+        : '<div class="notice">The long notes for this module are being written.</div>';
+
     const html = "" +
         '<div class="d-head">' +
-        '   <p class="d-eyebrow">Module ' + escapeHtml(found.no) + " of " + modules.length + " &middot; Overview</p>" +
+        '   <p class="d-eyebrow">Module ' + escapeHtml(found.no) + " of " + modules.length + "</p>" +
         '   <h2 class="d-title">' + escapeHtml(found.title) + "</h2>" +
         '   <p class="d-desc">' + escapeHtml(found.desc) + "</p>" +
         '   <div class="d-badges">' +
         '       <span class="d-badge">Topics <b>' + found.topics.length + "</b></span>" +
+        (notes.length ? '       <span class="d-badge">Long notes <b>' + notes.length + "</b></span>" : "") +
         '       <span class="d-badge">Track <b>' + escapeHtml(found.tagline) + "</b></span>" +
         "   </div>" +
         "</div>" +
@@ -3757,41 +3935,56 @@ function openModule(moduleNo) {
         '   <h3 class="panel-title">Learning Outcome</h3>' +
         "   <p>" + escapeHtml(found.outcome) + "</p>" +
         "</div>" +
+        noteHtml +
         '<div class="panel">' +
         '   <h3 class="panel-title">Topics in this module</h3>' +
         '   <div class="topic-list">' + items + "</div>" +
         "</div>" +
         '<div class="d-nav">' +
-        '   <button type="button" class="btn-ghost" onclick="closeModal()">&larr; Close</button>' +
-        '   <button type="button" class="btn-ghost" onclick="showPage(\'modules\'); closeModal();">&larr; All modules</button>' +
+        '   <button type="button" class="btn-ghost" onclick="go(\'/modules\')">&larr; All modules</button>' +
+        '   <button type="button" class="btn-ghost" onclick="go(\'/lab\')">Open the Python lab</button>' +
         "</div>";
 
-    openDetail(html);
+    renderView(html, {
+        crumb: 'Modules <span class="sep">/</span> Module ' + escapeHtml(found.no),
+        back: "All modules",
+        backTo: "/modules",
+        jump: moduleJumpHtml(list, found)
+    });
 }
 
 /* ---------- single topic ---------- */
 function openTopic(moduleNo, topicIndex) {
     const list = typeof modules === "undefined" ? [] : modules;
     const mod = list.filter(function (m) { return Number(m.no) === Number(moduleNo); })[0];
-    if (!mod) { toast("That module is not available yet."); return; }
+    if (!mod) { toast("That module is not available yet."); return go("/modules"); }
 
-    const t = mod.topics[Number(topicIndex) - 1];
-    if (!t) { toast("That topic is not available yet."); return; }
+    const index = Number(topicIndex);
+    const t = mod.topics[index - 1];
+    if (!t) { toast("That topic is not available yet."); return go("/module/" + mod.no); }
 
     const points = (t.p || []).map(function (p) {
         return "<li>" + escapeHtml(p) + "</li>";
     }).join("");
 
-    const related = t.exp && getExperiment(t.exp) ? "" +
+    const exp = t.exp ? getExperiment(t.exp) : null;
+    const related = exp ? "" +
         '<div class="link-row">' +
-        '   <button type="button" class="btn-link" onclick="closeModal(); openOverview(' + Number(t.exp) + ')">' +
-        '       <span class="gl">&#9679;</span> Related experiment ' + escapeHtml(getExperiment(t.exp).no) +
-        "</button>" +
+        '   <button type="button" class="btn-link" onclick="go(\'/exp/' + Number(exp.id) + '\')">' +
+        '       <span class="gl">&#9679;</span> Related experiment ' + escapeHtml(exp.no) +
+        "   </button>" +
         "</div>" : "";
+
+    /* the seven topics keep their original order */
+    const topicSteps = mod.topics.map(function (item, i) {
+        return '<button type="button" class="sub-step' + (i + 1 === index ? " active" : "") + '"' +
+            ' onclick="go(\'/topic/' + mod.no + "/" + (i + 1) + '\')"' +
+            ">" + (i + 1) + "</button>";
+    }).join("");
 
     const html = "" +
         '<div class="d-head">' +
-        '   <p class="d-eyebrow">Module ' + escapeHtml(mod.no) + " &middot; Topic " + escapeHtml(topicIndex) + " of " + mod.topics.length + "</p>" +
+        '   <p class="d-eyebrow">Module ' + escapeHtml(mod.no) + " &middot; Topic " + escapeHtml(index) + " of " + mod.topics.length + "</p>" +
         '   <h2 class="d-title">' + escapeHtml(t.t) + "</h2>" +
         '   <div class="d-badges">' +
         '       <span class="d-badge">Module <b>' + escapeHtml(mod.title) + "</b></span>" +
@@ -3806,12 +3999,24 @@ function openTopic(moduleNo, topicIndex) {
         '   <h3 class="panel-title">Key Points</h3>' +
         '   <ul class="topic-points">' + (points || "<li>Notes for this topic are coming soon.</li>") + "</ul>" +
         "</div>" +
+        '<div class="panel">' +
+        '   <h3 class="panel-title">Read the module notes</h3>' +
+        '   <p>The long notes of this module explain the idea in plain language, with flowcharts and worked examples.</p>' +
+        '   <button type="button" class="btn-overview" onclick="go(\'/module/' + mod.no + "\')\">" +
+        "       Read module " + escapeHtml(mod.no) + " <span class=\"btn-arrow\">&rarr;</span>" +
+        "   </button>" +
+        "</div>" +
         '<div class="d-nav">' +
-        '   <button type="button" class="btn-ghost" onclick="openModule(' + Number(mod.no) + ')">&larr; Back to module</button>' +
-        '   <button type="button" class="btn-ghost" onclick="closeModal()">Close</button>' +
+        '   <div class="sub-steps">' + topicSteps + "</div>" +
+        '   <button type="button" class="btn-ghost" onclick="go(\'/module/' + mod.no + '\')">&larr; Back to module</button>' +
         "</div>";
 
-    openDetail(html);
+    renderView(html, {
+        crumb: 'Modules <span class="sep">/</span> Module ' + escapeHtml(mod.no) +
+               ' <span class="sep">/</span> Topic ' + escapeHtml(index),
+        back: "Module " + mod.no,
+        backTo: "/module/" + mod.no
+    });
 }
 
 /* ---------- TOOLS page ---------- */
@@ -3840,6 +4045,59 @@ function renderTools() {
             '   <div class="tool-grid">' + cards + "</div>" +
             "</section>";
     }).join("");
+}
+
+/* ---------- RESOURCES page ---------- */
+function renderResources() {
+    const grid = document.getElementById("resourceGrid");
+    if (!grid || typeof resources === "undefined") return;
+    grid.innerHTML = resources.map(function (group) {
+        const cards = group.items.map(toolCardHtml).join("");
+        return "" +
+            '<section class="tool-group">' +
+            '   <div class="tool-group-head">' +
+            '       <h3>' + escapeHtml(group.group) + "</h3>" +
+            '       <span class="tool-count">' + group.items.length + " links</span>" +
+            "   </div>" +
+            '   <div class="tool-grid">' + cards + "</div>" +
+            "</section>";
+    }).join("");
+}
+
+/* ---------- PROJECTS page ---------- */
+function projectCardHtml(project) {
+    const chips = (project.skills || []).map(function (skill) {
+        return '<span class="chip"><span class="dot"></span>' + escapeHtml(skill) + "</span>";
+    }).join("");
+
+    const steps = (project.steps || []).map(function (step, i) {
+        return "<li>" + escapeHtml(step) + "</li>";
+    }).join("");
+
+    return "" +
+        '<article class="project-card">' +
+        '   <div class="project-head">' +
+        '       <span class="project-no">PROJECT ' + escapeHtml(project.no) + "</span>" +
+        '       <span class="project-tag">' + escapeHtml(project.tag || "Idea") + "</span>" +
+        "   </div>" +
+        '   <h3 class="project-title">' + escapeHtml(project.title) + "</h3>" +
+        '   <p class="project-tagline">' + project.tagline + "</p>" +
+        '   <p class="project-desc">' + escapeHtml(project.desc) + "</p>" +
+        '   <div class="project-rows">' +
+        '       <p class="project-row"><span class="pr-key">Data</span>' +
+        "           <span class=\"pr-val\">" + escapeHtml(project.data || "") + "</span></p>" +
+        '       <p class="project-row"><span class="pr-key">Deliverable</span>' +
+        "           <span class=\"pr-val\">" + escapeHtml(project.deliverable || "") + "</span></p>" +
+        "   </div>" +
+        '   <div class="project-skills">' + chips + "</div>" +
+        (steps ? '<div class="project-steps"><h4>How to start</h4><ol>' + steps + "</ol></div>" : "") +
+        "</article>";
+}
+
+function renderProjects() {
+    const grid = document.getElementById("projectGrid");
+    if (!grid || typeof projects === "undefined") return;
+    grid.innerHTML = projects.map(projectCardHtml).join("");
 }
 
 /* =========================================================
@@ -3948,7 +4206,7 @@ function videoFallback(videoEl) {
 
 /* If the browser never reports an error we still show the placeholder. */
 function guardVideos() {
-    const videos = document.querySelectorAll("#detail video");
+    const videos = document.querySelectorAll(".view-body video");
     Array.prototype.forEach.call(videos, function (video) {
         if (video.getAttribute("data-guard") === "done") return;
         video.setAttribute("data-guard", "done");
@@ -4002,9 +4260,11 @@ function cardHtml(exp) {
         "</article>";
 }
 
-function render(query) {
-    const grid = document.getElementById("grid");
-    const empty = document.getElementById("empty");
+/* One renderer for both card grids - the home collection and the
+   EXPERIMENTS page show the same cards, each with its own search box. */
+function renderCards(gridId, emptyId, query) {
+    const grid = document.getElementById(gridId);
+    const empty = document.getElementById(emptyId);
     if (!grid) return;
 
     const term = String(query || "").trim().toLowerCase();
@@ -4022,34 +4282,15 @@ function render(query) {
     }
 }
 
+function render(query) {
+    renderCards("grid", "empty", query);
+}
+
 /* =========================================================
-   8. MODAL
+   9. OVERVIEW PAGE  (full screen)
    ========================================================= */
-function openDetail(html) {
-    const modal = document.getElementById("modal");
-    const detail = document.getElementById("detail");
-    if (!modal || !detail) return;
-
-    detail.innerHTML = html;
-    modal.hidden = false;
-    document.body.style.overflow = "hidden";
-    guardVideos();
-
-    const close = document.getElementById("closeModal");
-    if (close) close.focus();
-}
-
-function closeModal() {
-    const modal = document.getElementById("modal");
-    const detail = document.getElementById("detail");
-    if (!modal) return;
-    modal.hidden = true;
-    document.body.style.overflow = "";
-    if (detail) detail.innerHTML = "";
-}
-
 /* =========================================================
-   9. OVERVIEW PAGE
+   9. OVERVIEW PAGE  (full screen)
    ========================================================= */
 function architectureHtml(exp) {
     if (!exp.architecture || !exp.architecture.length) return "";
@@ -4071,18 +4312,31 @@ function architectureHtml(exp) {
         "</div>";
 }
 
+/* Previous and next experiment - the order of the six experiments
+   never changes, so this simply walks the same array. */
+function experimentJumpHtml(exp) {
+    const list = experiments;
+    const position = list.indexOf(exp);
+    const prev = position > 0 ? list[position - 1] : null;
+    const next = position > -1 && position < list.length - 1 ? list[position + 1] : null;
+
+    return "" +
+        (prev ? '<button type="button" class="view-step" onclick="go(\'/exp/' + prev.id + '\')">&larr; Exp ' + escapeHtml(prev.no) + "</button>" : "") +
+        (next ? '<button type="button" class="view-step" onclick="go(\'/exp/' + next.id + '\')">Exp ' + escapeHtml(next.no) + " &rarr;</button>" : "");
+}
+
 function openOverview(experimentId) {
     const exp = getExperiment(experimentId);
     if (!exp) {
         toast("That experiment is not available yet.");
-        return;
+        return go("/experiments");
     }
 
     const subs = getSubList(exp);
     const subButtons = subs.map(function (key) {
         const sub = (subData[exp.id] || {})[key] || {};
         return "" +
-            '<button type="button" class="sub-btn" onclick="openSub(' + Number(exp.id) + ", '" + escapeHtml(key) + "')" + '">' +
+            '<button type="button" class="sub-btn" onclick="go(\'/sub/' + Number(exp.id) + ", '" + escapeHtml(key) + "')" + '">' +
             '   <span class="sub-key">' + escapeHtml(key) + "</span>" +
             '   <span class="sub-name">' + escapeHtml(sub.name || key) + "</span>" +
             (sub.label ? '   <span class="sub-label">' + escapeHtml(sub.label) + "</span>" : "") +
@@ -4099,7 +4353,7 @@ function openOverview(experimentId) {
 
     const html = "" +
         '<div class="d-head">' +
-        '   <p class="d-eyebrow">Experiment ' + escapeHtml(exp.no) + " &middot; Overview</p>" +
+        '   <p class="d-eyebrow">Experiment ' + escapeHtml(exp.no) + " of " + experiments.length + "</p>" +
         '   <h2 class="d-title">' + escapeHtml(exp.title) +
         (exp.subtitle ? ' <span class="d-sub">' + escapeHtml(exp.subtitle) + "</span>" : "") +
         "</h2>" +
@@ -4114,6 +4368,7 @@ function openOverview(experimentId) {
         '<div class="link-row">' +
         '   <a class="btn-link" href="' + safeUrl(GITHUB_BASE + "/experiment-" + exp.no) + '" target="_blank" rel="noopener"><span class="gl">&#9679;</span> GitHub Repository</a>' +
         '   <a class="btn-link" href="' + safeUrl(YOUTUBE_BASE + encodeURIComponent(exp.yt)) + '" target="_blank" rel="noopener"><span class="yt">&#9654;</span> YouTube Reference</a>' +
+        '   <button type="button" class="btn-link" onclick="go(\'/experiments\')"><span class="gl">&#9634;</span> All experiments</button>' +
         "</div>" +
         '<div class="panel">' +
         '   <h3 class="panel-title">Summary &amp; Analysis</h3>' +
@@ -4122,16 +4377,24 @@ function openOverview(experimentId) {
         "</div>" +
         '<div class="panel">' +
         '   <h3 class="panel-title">Sub-Experiments</h3>' +
+        '   <p class="panel-hint">Open a sub-experiment for the program, the recorded output and the Python lab. ' +
+        "        The order below is the order of the laboratory record and it never changes.</p>" +
         '   <div class="subs">' + (subButtons ||
             '<p class="notice">Sub-experiment details are being added for this experiment.</p>') + "</div>" +
         "</div>" +
         architectureHtml(exp) +
         '<div class="d-nav">' +
-        '   <button type="button" class="btn-ghost" onclick="closeModal()">&larr; Close</button>' +
+        '   <button type="button" class="btn-ghost" onclick="go(\'/experiments\')">&larr; All experiments</button>' +
         '   <span class="code-file">' + escapeHtml(COURSE.student) + " &middot; " + escapeHtml(COURSE.roll) + "</span>" +
+        '   <button type="button" class="btn-ghost" onclick="go(\'/lab\')">Open the Python lab</button>' +
         "</div>";
 
-    openDetail(html);
+    renderView(html, {
+        crumb: 'Experiments <span class="sep">/</span> Experiment ' + escapeHtml(exp.no),
+        back: "All experiments",
+        backTo: "/experiments",
+        jump: experimentJumpHtml(exp)
+    });
 }
 
 /* =========================================================
@@ -4142,13 +4405,25 @@ function openOverview(experimentId) {
    variable instead of the markup, so nothing is displayed before RUN. */
 let lastResult = "";
 
+/* Previous / next sub-experiment of the same experiment, in the
+   same order as the record. */
+function subJumpHtml(experimentId, keys, currentKey) {
+    const position = keys.indexOf(currentKey);
+    const prev = position > 0 ? keys[position - 1] : null;
+    const next = position > -1 && position < keys.length - 1 ? keys[position + 1] : null;
+
+    return "" +
+        (prev ? '<button type="button" class="view-step" onclick="go(\'/sub/' + experimentId + "/" + escapeHtml(prev) + '\')">&larr; ' + escapeHtml(prev) + "</button>" : "") +
+        (next ? '<button type="button" class="view-step" onclick="go(\'/sub/' + experimentId + "/" + escapeHtml(next) + '\')">' + escapeHtml(next) + " &rarr;</button>" : "");
+}
+
 function openSub(experimentId, subKey) {
     const eid = Number(experimentId);
     const exp = getExperiment(eid);
 
     if (!exp) {
         toast("That experiment is not available yet.");
-        return;
+        return go("/experiments");
     }
 
     /*  The experiment id is part of the lookup on purpose -
@@ -4157,7 +4432,7 @@ function openSub(experimentId, subKey) {
     const data = group ? group[subKey] : null;
 
     if (!data) {
-        openDetail(
+        renderView(
             '<div class="d-head">' +
             '   <p class="d-eyebrow">Experiment ' + escapeHtml(exp.no) + " &middot; Sub-experiment " + escapeHtml(subKey) + "</p>" +
             '   <h2 class="d-title">' + escapeHtml(exp.title) + "</h2>" +
@@ -4165,22 +4440,32 @@ function openSub(experimentId, subKey) {
             '<div class="notice">The program for sub-experiment ' + escapeHtml(subKey) +
             " of this experiment has not been uploaded yet. The code and the result will appear here once it is added to script.js.</div>" +
             '<div class="d-nav">' +
-            '   <button type="button" class="btn-ghost" onclick="openOverview(' + eid + ')">&larr; Back to overview</button>' +
-            "   <button type=\"button\" class=\"btn-ghost\" onclick=\"closeModal()\">Close</button>" +
-            "</div>"
+            '   <button type="button" class="btn-ghost" onclick="go(\'/exp/' + eid + '\')">&larr; Back to overview</button>' +
+            "</div>",
+            {
+                crumb: 'Experiments <span class="sep">/</span> Exp ' + escapeHtml(exp.no) +
+                       ' <span class="sep">/</span> ' + escapeHtml(subKey),
+                back: "Overview",
+                backTo: "/exp/" + eid
+            }
         );
         return;
     }
 
+    labStateInit("Sub", (data && data.code) ? data.code : LAB_BLANK);
+
     const keys = Object.keys(group);
     const position = keys.indexOf(subKey) + 1;
-    /* every step is a link to the next sub-experiment of the same experiment */
+    /* every step is a link to the next sub-experiment of the same experiment,
+       in exactly the same order as the laboratory record */
     const steps = keys.map(function (key) {
         return '<button type="button" class="sub-step' + (key === subKey ? " active" : "") + '"' +
-            ' onclick="openSub(' + eid + ", '" + escapeHtml(key) + "')" + '"' +
+            ' onclick="go(\'/sub/' + eid + "/" + escapeHtml(key) + "\')" + '"' +
             (key === subKey ? ' aria-current="true"' : ' title="Go to sub-experiment ' + escapeHtml(key) + '"') +
             ">" + escapeHtml(key) + "</button>";
     }).join("");
+
+    const fileName = data.file || "experiment-" + exp.no + "-" + subKey + ".py";
 
     const code = data.code || "Code for this sub-experiment is not available yet.";
     const result = data.result || "No result has been recorded for this sub-experiment yet.";
@@ -4196,7 +4481,7 @@ function openSub(experimentId, subKey) {
         '   <div class="d-badges">' +
         '       <span class="d-badge">Experiment <b>' + escapeHtml(exp.no) + " &middot; " + escapeHtml(subKey) + "</b></span>" +
         '       <span class="d-badge">Step <b>' + position + " of " + keys.length + "</b></span>" +
-        '       <span class="d-badge">File <b>' + escapeHtml(data.file || "experiment-" + exp.no + "-" + subKey + ".py") + "</b></span>" +
+        '       <span class="d-badge">File <b>' + escapeHtml(fileName) + "</b></span>" +
         "   </div>" +
         "</div>" +
         videoBlockHtml(data.video, "Sub-experiment " + subKey + " - demonstration") +
@@ -4216,7 +4501,7 @@ function openSub(experimentId, subKey) {
         '<div class="panel">' +
         '   <h3 class="panel-title">Program / Code</h3>' +
         '   <div class="code-head">' +
-        '       <span class="code-file">File: <b>' + escapeHtml(data.file || "experiment-" + exp.no + "-" + subKey + ".py") + "</b></span>" +
+        '       <span class="code-file">File: <b>' + escapeHtml(fileName) + "</b></span>" +
         '       <div class="code-tools">' +
         '           <span class="code-status">python 3 &middot; output saved with the session</span>' +
         '           <button type="button" class="btn-run" onclick="runCode(this)">&#9654; RUN</button>' +
@@ -4225,13 +4510,31 @@ function openSub(experimentId, subKey) {
         "   </div>" +
         '   <pre class="code"><code>' + escapeHtml(code) + "</code></pre>" +
         "</div>" +
+        '<div class="panel">' +
+        '   <div class="lab-cta">' +
+        '       <div>' +
+        '           <h3 class="panel-title">Try It Yourself</h3>' +
+        "           <p>Practise the same idea right here. Write your own code in the editor," +
+        "               run it and read the console output, or open the full lab page" +
+        "               when you want an empty editor with templates.</p>" +
+        "       </div>" +
+        '       <div class="lab-cta-buttons">' +
+        '           <button type="button" class="btn-lab-open" onclick="labOpenSub(' + eid + ", '" + escapeHtml(subKey) + "')" + '>' +
+        "               TRY IT YOURSELF" +
+        "           </button>" +
+        '           <button type="button" class="btn-lab-ghost" onclick="go(\'/lab\')">Open the lab page</button>' +
+        "       </div>" +
+        '   <div class="lab" id="labSubPanel" hidden>' +
+        labBlockHtml("Sub") +
+        "   </div>" +
+        "</div>" +
         '<div class="panel" id="resultPanel">' +
         '   <h3 class="panel-title">Result</h3>' +
         '   <div class="result-locked" id="resultLocked">' +
         '       <div class="locked-icon">&#9654;</div>' +
         '       <p class="locked-title">Output is hidden</p>' +
         '       <p class="locked-note">Press <strong>RUN</strong> above to execute ' +
-        escapeHtml(data.file || "experiment-" + exp.no + "-" + subKey + ".py") + " and show the console output here.</p>" +
+        escapeHtml(fileName) + " and show the console output here.</p>" +
         "   </div>" +
         '   <div class="result-body" id="resultBody" hidden>' +
         '       <pre class="result" id="resultText"></pre>' +
@@ -4239,12 +4542,19 @@ function openSub(experimentId, subKey) {
         "   </div>" +
         "</div>" +
         '<div class="d-nav">' +
-        '   <button type="button" class="btn-ghost" onclick="openOverview(' + eid + ')">&larr; Back to overview</button>' +
+        '   <button type="button" class="btn-ghost" onclick="go(\'/exp/' + eid + '\')">&larr; Back to overview</button>' +
         '   <div class="sub-steps">' + steps + "</div>" +
-        '   <button type="button" class="btn-ghost" onclick="closeModal()">Close</button>' +
+        '   <button type="button" class="btn-ghost" onclick="go(\'/experiments\')">All experiments</button>' +
         "</div>";
 
-    openDetail(html);
+
+    renderView(html, {
+        crumb: 'Experiments <span class="sep">/</span> Exp ' + escapeHtml(exp.no) +
+               ' <span class="sep">/</span> Sub-experiment ' + escapeHtml(subKey),
+        back: "Overview",
+        backTo: "/exp/" + eid,
+        jump: subJumpHtml(eid, keys, subKey)
+    });
 }
 
 /* =========================================================
@@ -4348,62 +4658,745 @@ function copyCode(button) {
 }
 
 /* =========================================================
-   12. INITIALISATION
+   12. PYTHON LAB  (Try It Yourself)
+   -------------------------------------------------------------
+   A real Python 3 sandbox that runs inside the browser through
+   Pyodide (Python compiled to WebAssembly). The editor opens
+   under the program of every sub-experiment, pre-filled with
+   that program so it can be changed and practised freely.
+   The runtime is downloaded once, on the first use, and only
+   when the student presses RUN.
+   ========================================================= */
+var labState = (window.labState = {});
+const PYODIDE_VERSION = "0.26.4";
+const PYODIDE_CDN = "https://cdn.jsdelivr.net/pyodide/v" + PYODIDE_VERSION + "/full/";
+
+let pyRuntime = null;        /* the Pyodide instance, once it is ready   */
+let pyBooting = null;         /* the promise of the very first load       */
+let pyPackages = null;        /* the promise of the numpy + pandas load  */
+let pyHasPandas = false;      /* true after numpy + pandas are available  */
+let pyPythonTag = "python 3";/* version line printed in the status pill  */
+
+/* editor content is kept per sub-experiment so switching between
+   the JUMP TO buttons does not throw the practice code away */
+const labDrafts = {};
+const labCurrent = { eid: 0, key: "", starter: "" };
+
+var LAB_BLANK = [
+    "# Try It Yourself - write any Python here and press RUN CODE",
+    "import pandas as pd",
+    "",
+    "df = pd.DataFrame({",
+    "    \"Name\"    : [\"Aisha\", \"Rahul\", \"Sneha\"],",
+    "    \"Branch\"  : [\"CSE\", \"CSE\", \"ECE\"],",
+    "    \"CGPA\"    : [8.9, 7.4, 9.1],",
+    "})",
+    "",
+    "print(df)",
+    "print(\"\\nAverage CGPA:\", round(df[\"CGPA\"].mean(), 2))",
+].join("\n");
+
+function labPanelHtml() {
+    return "" +
+        '<p class="lab-intro">A real Python 3 sandbox (Pyodide) running inside your browser' +
+        " &middot; numpy and pandas are loaded automatically on the first run.</p>" +
+        '<div class="lab-head">' +
+        '   <span class="code-status" id="labStatus">runtime not started</span>' +
+        '   <div class="lab-tools">' +
+        '       <button type="button" class="btn-run" onclick="runLab(this)">&#9654; RUN CODE</button>' +
+        '       <button type="button" class="btn-copy" onclick="copyLab(this)">&#10697; COPY</button>' +
+        '       <button type="button" class="btn-lab-ghost" onclick="fillLab(\'experiment\')">START FROM EXPERIMENT</button>' +
+        '       <button type="button" class="btn-lab-ghost" onclick="fillLab(\'blank\')">BLANK TEMPLATE</button>' +
+        '       <button type="button" class="btn-lab-ghost" onclick="loadMatplotlib(this)">LOAD MATPLOTLIB</button>' +
+        '       <button type="button" class="btn-lab-ghost" onclick="clearLabOutput()">CLEAR OUTPUT</button>' +
+        "   </div>" +
+        "</div>" +
+        '<div class="lab-editor">' +
+        '   <pre class="lab-gutter" id="labGutter" aria-hidden="true">1</pre>' +
+        '   <textarea id="labEditor" class="lab-code" spellcheck="false" autocomplete="off"' +
+        '             autocapitalize="off" autocorrect="off" wrap="off"' +
+        '             aria-label="Python code editor"></textarea>' +
+        "</div>" +
+        '<div class="lab-console">' +
+        '   <pre class="lab-out" id="labOut" aria-live="polite">Press RUN CODE to execute this file.</pre>' +
+        '   <div class="lab-images" id="labImages"></div>' +
+        "</div>" +
+        '<p class="lab-hint">Ctrl + Enter runs the code &middot; the first run downloads the' +
+        " Python runtime once and needs an internet connection &middot; plots created with" +
+        " <code>plt.savefig</code> are shown below the console.</p>";
+}
+
+/* Opens and closes the editor, and prepares it on first use. */
+function toggleLab(experimentId, subKey) {
+    const panel = document.getElementById("labPanel");
+    if (!panel) return;
+
+    const eid = Number(experimentId);
+    const key = String(subKey);
+    const group = subData[eid] || {};
+    const data = group[key] || {};
+
+    if (!panel.hidden) {
+        panel.hidden = true;
+        return;
+    }
+
+    labCurrent.eid = eid;
+    labCurrent.key = key;
+    labCurrent.starter = data.code || LAB_BLANK;
+
+    panel.hidden = false;
+
+    const editor = document.getElementById("labEditor");
+    if (editor) {
+        editor.value = Object.prototype.hasOwnProperty.call(labDrafts, eid + "-" + key)
+            ? labDrafts[eid + "-" + key]
+            : labCurrent.starter;
+        wireLabEditor(editor);
+        syncLabGutter();
+    }
+
+    panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (editor) editor.focus();
+
+    /* warm the runtime up in the background so the first RUN is fast */
+    ensurePython();
+}
+
+/* The editor is rebuilt every time a sub-experiment is opened, so its
+   listeners are attached once per element. */
+function wireLabEditor(editor) {
+    if (!editor || editor.getAttribute("data-wired") === "done") return;
+    editor.setAttribute("data-wired", "done");
+
+    editor.addEventListener("input", function () {
+        labDrafts[labCurrent.eid + "-" + labCurrent.key] = editor.value;
+        syncLabGutter();
+    });
+
+    editor.addEventListener("scroll", function () {
+        const gutter = document.getElementById("labGutter");
+        if (gutter) gutter.scrollTop = editor.scrollTop;
+    });
+
+    editor.addEventListener("keydown", function (event) {
+        if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+            event.preventDefault();
+            runLab(null);
+            return;
+        }
+        if (event.key === "Tab") {                 /* tab inserts four spaces */
+            event.preventDefault();
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+            editor.value = editor.value.slice(0, start) + "    " + editor.value.slice(end);
+            editor.selectionStart = editor.selectionEnd = start + 4;
+            labDrafts[labCurrent.eid + "-" + labCurrent.key] = editor.value;
+            syncLabGutter();
+        }
+    });
+}
+
+function syncLabGutter() {
+    const editor = document.getElementById("labEditor");
+    const gutter = document.getElementById("labGutter");
+    if (!editor || !gutter) return;
+
+    const total = editor.value.split("\n").length;
+    const numbers = [];
+    for (let i = 1; i <= total; i++) numbers.push(i);
+    gutter.textContent = numbers.join("\n");
+    gutter.scrollTop = editor.scrollTop;
+}
+
+function setLabStatus(text, done) {
+    const pill = document.getElementById("labStatus");
+    if (!pill) return;
+    pill.textContent = text;
+    pill.classList.toggle("done", Boolean(done));
+}
+
+function labWrite(text, isError) {
+    const out = document.getElementById("labOut");
+    if (!out) return;
+    out.classList.toggle("error", Boolean(isError));
+    const previous = out.textContent.replace(/\n+$/, "").replace(/\n?>>> done[^\n]*$/, "");
+    out.textContent = (previous ? previous + "\n" : "") + text;
+    out.scrollTop = out.scrollHeight;
+}
+
+function clearLabOutput() {
+    const out = document.getElementById("labOut");
+    if (out) {
+        out.textContent = "";
+        out.classList.remove("error");
+    }
+    const images = document.getElementById("labImages");
+    if (images) images.innerHTML = "";
+}
+
+function fillLab(mode) {
+    const editor = document.getElementById("labEditor");
+    if (!editor) return;
+
+    if (mode === "blank") {
+        if (!window.confirm("Replace the editor content with a blank template?")) return;
+        editor.value = LAB_BLANK;
+    } else {
+        editor.value = labCurrent.starter || LAB_BLANK;
+    }
+
+    labDrafts[labCurrent.eid + "-" + labCurrent.key] = editor.value;
+    syncLabGutter();
+    clearLabOutput();
+    editor.focus();
+    toast("Editor loaded - change anything you like and press RUN CODE.");
+}
+
+/* Downloads and starts the Python runtime exactly once. */
+function ensurePython() {
+    if (pyRuntime) return Promise.resolve(pyRuntime);
+    if (pyBooting) return pyBooting;
+
+    setLabStatus("loading python runtime\u2026");
+
+    pyBooting = new Promise(function (resolve, reject) {
+        function boot() {
+            if (typeof window.loadPyodide !== "function") {
+                reject(new Error("the Python runtime did not start"));
+                return;
+            }
+            try {
+                resolve(window.loadPyodide({ indexURL: PYODIDE_CDN }));
+            } catch (err) {
+                reject(err);
+            }
+        }
+
+        if (typeof window.loadPyodide === "function") { boot(); return; }
+
+        const tag = document.createElement("script");
+        tag.src = PYODIDE_CDN + "pyodide.js";
+        tag.async = true;
+        tag.onload = boot;
+        tag.onerror = function () { reject(new Error("the Python runtime could not be downloaded")); };
+        document.head.appendChild(tag);
+    }).then(function (py) {
+        pyRuntime = py;
+        try {
+            pyPythonTag = "python " + String(py.runPython("__import__('sys').version.split()[0]")).trim();
+        } catch (err) {
+            pyPythonTag = "python 3";
+        }
+        /* pandas prints one long deprecation notice about pyarrow on the
+           first import - that is a library message, not a lab message */
+        try {
+            py.runPython("import warnings\nwarnings.filterwarnings('ignore', message='.*Pyarrow will become a required.*', category=DeprecationWarning)");
+        } catch (err) { /* warnings are optional, ignore a failure here */ }
+        setLabStatus(pyPythonTag + " ready", true);
+        loadCorePackages();
+        return py;
+    }).catch(function (err) {
+        pyBooting = null;
+        setLabStatus("runtime unavailable", false);
+        throw err;
+    });
+
+    return pyBooting;
+}
+
+/* numpy and pandas are the two packages every lab program needs. */
+function loadCorePackages() {
+    if (!pyRuntime || pyHasPandas) return pyPackages || Promise.resolve();
+    if (pyPackages) return pyPackages;
+
+    setLabStatus("loading numpy + pandas (first run)\u2026");
+
+    pyPackages = pyRuntime.loadPackage(["numpy", "pandas"]).then(function () {
+        pyHasPandas = true;
+
+        /* pandas prints a long deprecation notice about pyarrow the first
+           time it is imported. Importing it here, with the error channel
+           muted, keeps that library noise out of the student's console -
+           their own "import pandas" is then simply a cache hit. */
+        try {
+            pyRuntime.setStderr({ batched: function () { /* muted on purpose */ } });
+            pyRuntime.runPython("import warnings\nwarnings.filterwarnings('ignore', category=DeprecationWarning)\nimport numpy\nimport pandas");
+            pyRuntime.setStderr({});
+        } catch (err) {
+            pyRuntime.setStderr({});
+        }
+
+        setLabStatus(pyPythonTag + " \u00b7 pandas ready", true);
+    }).catch(function () {
+        setLabStatus(pyPythonTag + " \u00b7 numpy/pandas unavailable", true);
+    });
+
+    return pyPackages;
+}
+
+function offlineHelp() {
+    return "" +
+        "The Python lab needs an internet connection the first time it is used, because" +
+        " the runtime is downloaded from cdn.jsdelivr.net.\n\n" +
+        "While offline you can still write code here - press COPY, paste it into IDLE," +
+        " VS Code or Google Colab and run it there.";
+}
+
+async function runLab(button) {
+    const editor = document.getElementById("labEditor");
+    if (!editor) return;
+
+    const code = editor.value;
+    labDrafts[labCurrent.eid + "-" + labCurrent.key] = code;
+
+    clearLabOutput();
+    labWrite(">>> running " + new Date().toLocaleTimeString() + "\n", false);
+
+    if (button) button.disabled = true;
+
+    let py;
+    try {
+        py = await ensurePython();
+    } catch (err) {
+        labWrite("\n" + offlineHelp(), true);
+        if (button) button.disabled = false;
+        return;
+    }
+
+    setLabStatus("running\u2026");
+
+    /* the packages must be in place before the student code is sent over,
+       otherwise "import pandas" fails on a program that is perfectly fine */
+    await loadCorePackages();
+
+    const started = Date.now();
+    let stdout = "";
+    let stderr = "";
+    let failure = null;
+
+    py.setStdout({ batched: function (text) { stdout += text + "\n"; } });
+    py.setStderr({ batched: function (text) { stderr += text + "\n"; } });
+
+    try {
+        await py.runPythonAsync(code);
+    } catch (err) {
+        failure = err;
+    }
+
+    py.setStdout({});
+    py.setStderr({});
+
+    const took = ((Date.now() - started) / 1000).toFixed(2);
+    const report = splitLabOutput(stdout, stderr);
+
+    if (report.text.trim()) labWrite(report.text, Boolean(failure));
+    if (failure) {
+        labWrite((report.text.trim() ? "\n" : "") + String(failure.message || failure), true);
+    } else if (!report.text.trim()) {
+        labWrite("(program finished without printing anything)", false);
+    }
+
+    showLabImages(report.images);
+    labWrite(">>> done in " + took + " s", Boolean(failure));
+
+    if (failure) setLabStatus(pyPythonTag + " \u00b7 stopped with an error", false);
+    else setLabStatus(pyPythonTag + " \u00b7 executed", true);
+    if (button) button.disabled = false;
+}
+
+/* A line that starts with DATA:image/... is a figure made with
+   plt.savefig() - it is moved out of the console and shown as a
+   picture instead of a wall of base64 text. */
+function splitLabOutput(stdout, stderr) {
+    const lines = String(stdout + (stderr ? (stdout ? "\n" : "") + stderr : "")).split("\n");
+    const kept = [];
+    const images = [];
+
+    lines.forEach(function (line) {
+        const trimmed = line.trim();
+        if (trimmed.indexOf("DATA:image/") === 0 && trimmed.length > 64) {
+            images.push(trimmed);
+            kept.push("   [figure rendered below]");
+        } else {
+            kept.push(line);
+        }
+    });
+
+    return { text: kept.join("\n").replace(/\n+$/, ""), images: images };
+}
+
+function showLabImages(images) {
+    const box = document.getElementById("labImages");
+    if (!box) return;
+    box.innerHTML = "";
+    images.forEach(function (src) {
+        const img = document.createElement("img");
+        img.src = src;
+        img.alt = "Figure produced by the Python lab";
+        box.appendChild(img);
+    });
+}
+
+function loadMatplotlib(button) {
+    if (button) button.disabled = true;
+    setLabStatus("loading matplotlib\u2026");
+
+    ensurePython().then(function (py) {
+        return py.loadPackage("matplotlib");
+    }).then(function () {
+        setLabStatus(pyPythonTag + " \u00b7 matplotlib ready", true);
+        labWrite("matplotlib is ready, for example:\n\n" +
+            "    import matplotlib.pyplot as plt\n" +
+            "    import base64\n" +
+            "    df[\"CGPA\"].plot(kind=\"bar\")\n" +
+            "    plt.savefig(\"lab.png\")\n" +
+            "    print(\"DATA:image/png;base64,\" +\n" +
+            "          base64.b64encode(open(\"lab.png\", \"rb\").read()).decode())\n", false);
+        if (button) button.disabled = false;
+    }).catch(function () {
+        setLabStatus("matplotlib unavailable", false);
+        labWrite("matplotlib could not be downloaded. The rest of the lab works without it.", true);
+        if (button) button.disabled = false;
+    });
+}
+
+function copyLab(button) {
+    const editor = document.getElementById("labEditor");
+    if (!editor || !editor.value.trim()) {
+        toast("There is no code in the editor yet.");
+        return;
+    }
+
+    function done() { toast("Code copied from the Python lab!"); }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(editor.value).then(done).catch(function () { toast("Copy failed - please select the code manually."); });
+    } else {
+        toast("Copy is not available in this browser - please select the code manually.");
+    }
+}
+
+/* =========================================================
+   12b. PYTHON LAB BLOCK (shared between the LAB page and the
+   sub-experiment page). Ids are suffixed with a prefix so
+   two different lab blocks never share the same elements.
+   ========================================================= */
+
+function labBlockHtml(prefix, options) {
+    var opts = options || {};
+    var hasExperiment = (opts.starter !== undefined && opts.starter !== null);
+    var starter = hasExperiment ? opts.starter : LAB_BLANK;
+
+    var html = "" +
+        '<p class="lab-intro">A real Python 3 sandbox (Pyodide) running inside your browser' +
+        " &middot; numpy and pandas are loaded automatically on the first run.</p>" +
+        '<div class="lab-head">' +
+        '   <span class="code-status" id="labStatus' + prefix + '">runtime not started</span>' +
+        '   <div class="lab-tools">' +
+        '       <button type="button" class="btn-run" onclick="labRun(\'' + prefix + '\', this)">&#9654; RUN CODE</button>' +
+        '       <button type="button" class="btn-copy" onclick="labCopy(\'' + prefix + '\')">&#10697; COPY</button>' +
+        (hasExperiment
+            ? '       <button type="button" class="btn-lab-ghost" onclick="labFill(\'' + prefix + '\', \'experiment\')">START FROM EXPERIMENT</button>'
+            : '') +
+        '       <button type="button" class="btn-lab-ghost" onclick="labFill(\'' + prefix + '\', \'blank\')">BLANK TEMPLATE</button>' +
+        '       <button type="button" class="btn-lab-ghost" onclick="labMatplotlib(\'' + prefix + '\', this)">LOAD MATPLOTLIB</button>' +
+        '       <button type="button" class="btn-lab-ghost" onclick="labClear(\'' + prefix + '\')">CLEAR OUTPUT</button>' +
+        '   </div>' +
+        '</div>' +
+        '<div class="lab-editor">' +
+        '   <pre class="lab-gutter" id="labGutter' + prefix + '" aria-hidden="true">1</pre>' +
+        '   <textarea id="labEditor' + prefix + '" class="lab-code" spellcheck="false" autocomplete="off"' +
+        '             autocapitalize="off" autocorrect="off" wrap="off"' +
+        '             aria-label="Python code editor"></textarea>' +
+        '</div>' +
+        '<div class="lab-console">' +
+        '   <pre class="lab-out" id="labOut' + prefix + '" aria-live="polite">Press RUN CODE to execute this file.</pre>' +
+        '   <div class="lab-images" id="labImages' + prefix + '"></div>' +
+        '</div>' +
+        '<p class="lab-hint">Ctrl + Enter runs the code &middot; the first run downloads the' +
+        " Python runtime once and needs an internet connection &middot; plots created with" +
+        " <code>plt.savefig</code> are shown below the console.</p>";
+
+    return html;
+}
+
+function labStateInit(prefix, starter) {
+    if (!labState[prefix]) labState[prefix] = { starter: starter || LAB_BLANK, draft: null };
+    else if (starter) labState[prefix].starter = starter;
+    return labState[prefix];
+}
+
+function labMount(prefix, starter) {
+    var editor = document.getElementById("labEditor" + prefix);
+    if (!editor) return;
+    var state = labStateInit(prefix, starter);
+    editor.value = (state.draft !== null) ? state.draft : state.starter;
+    wireLabEditor(prefix);
+    labSyncGutterNow(prefix);
+    var out = document.getElementById("labOut" + prefix);
+    if (out) out.textContent = "Press RUN CODE to execute this file.";
+    var images = document.getElementById("labImages" + prefix);
+    if (images) images.innerHTML = "";
+}
+
+function labOpenSub(eid, subKey) {
+    var panel = document.getElementById("labSubPanel");
+    if (!panel) return;
+    var key = String(subKey);
+    var group = subData[eid] || {};
+    var data = group[key] || {};
+
+    if (!panel.hidden) { panel.hidden = true; return; }
+
+    labStateInit("Sub", data.code || LAB_BLANK);
+    panel.hidden = false;
+    labMount("Sub", data.code || LAB_BLANK);
+    panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    var editor = document.getElementById("labEditorSub");
+    if (editor) editor.focus();
+    ensurePython();
+}
+
+function wireLabEditor(prefix) {
+    var editor = document.getElementById("labEditor" + prefix);
+    if (!editor || editor.getAttribute("data-wired") === "done") return;
+    editor.setAttribute("data-wired", "done");
+    editor.addEventListener("input", function () {
+        if (!labState[prefix]) labState[prefix] = { starter: LAB_BLANK, draft: null };
+        labState[prefix].draft = editor.value;
+        labSyncGutterNow(prefix);
+    });
+    editor.addEventListener("scroll", function () {
+        var gutter = document.getElementById("labGutter" + prefix);
+        if (gutter) gutter.scrollTop = editor.scrollTop;
+    });
+    editor.addEventListener("keydown", function (event) {
+        if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+            event.preventDefault();
+            labRun(prefix, null);
+            return;
+        }
+        if (event.key === "Tab") {
+            event.preventDefault();
+            var start = editor.selectionStart;
+            var end = editor.selectionEnd;
+            editor.value = editor.value.slice(0, start) + "    " + editor.value.slice(end);
+            editor.selectionStart = editor.selectionEnd = start + 4;
+            if (!labState[prefix]) labState[prefix] = { starter: LAB_BLANK, draft: null };
+            labState[prefix].draft = editor.value;
+            labSyncGutterNow(prefix);
+        }
+    });
+}
+
+function labSyncGutterNow(prefix) {
+    var editor = document.getElementById("labEditor" + prefix);
+    var gutter = document.getElementById("labGutter" + prefix);
+    if (!editor || !gutter) return;
+    var total = editor.value.split("\n").length;
+    var nums = [];
+    for (var i = 1; i <= total; i++) nums.push(i);
+    gutter.textContent = nums.join("\n");
+    gutter.scrollTop = editor.scrollTop;
+}
+
+function labRun(prefix, button) {
+    var editor = document.getElementById("labEditor" + prefix);
+    var out = document.getElementById("labOut" + prefix);
+    var status = document.getElementById("labStatus" + prefix);
+    if (!editor || !out) return;
+
+    var code = editor.value;
+    if (labState[prefix]) labState[prefix].draft = code;
+
+    var btn = button;
+    if (button && button.addEventListener === undefined) button = undefined;
+    var b = (button && typeof button === "object" && "closest" in button) ? button : null;
+
+    out.textContent = "";
+    out.classList.remove("error");
+    out.textContent = ">>> running " + new Date().toLocaleTimeString() + "\n";
+    out.scrollTop = out.scrollHeight;
+    if (b) b.disabled = true;
+
+    ensurePython().then(function (py) {
+        setLabStatusPrefix(prefix, "running\u2026", false);
+        return loadCorePackages().then(function () {
+            var started = Date.now();
+            var stdout = "", stderr = "", failure = null;
+
+            py.setStdout({ batched: function (text) { stdout += text + "\n"; } });
+            py.setStderr({ batched: function (text) { stderr += text + "\n"; } });
+
+            return py.runPythonAsync(code).then(function () {}, function (err) { failure = err; }).then(function () {
+                py.setStdout({}); py.setStderr({});
+                var took = ((Date.now() - started) / 1000).toFixed(2);
+                var report = splitLabOutput(stdout, stderr);
+                if (report.text.trim()) writeLabOutputPrefix(prefix, report.text, Boolean(failure));
+                if (failure) {
+                    writeLabOutputPrefix(prefix, (report.text.trim() ? "\n" : "") + String(failure.message || failure), true);
+                } else if (!report.text.trim()) {
+                    var o = document.getElementById("labOut" + prefix);
+                    if (o) o.textContent = "(program finished without printing anything)\n";
+                }
+                showLabImagesPrefix(prefix, report.images);
+                var o2 = document.getElementById("labOut" + prefix);
+                if (o2) o2.textContent += "\n>>> done in " + took + " s";
+                if (failure) setLabStatusPrefix(prefix, pyPythonTag + " stopped with an error", false);
+                else setLabStatusPrefix(prefix, pyPythonTag + " executed", true);
+            });
+        });
+    }).catch(function (err) {
+        var o3 = document.getElementById("labOut" + prefix);
+        if (o3) o3.textContent = offlineHelp();
+        setLabStatusPrefix(prefix, "runtime unavailable", false);
+    }).then(function () {
+        if (b) b.disabled = false;
+    });
+}
+
+function writeLabOutputPrefix(prefix, text, isError) {
+    var out = document.getElementById("labOut" + prefix);
+    if (!out) return;
+    out.classList.toggle("error", Boolean(isError));
+    out.textContent = out.textContent.replace(/\n+$/, "") + "\n" + text;
+    out.scrollTop = out.scrollHeight;
+}
+
+function setLabStatusPrefix(prefix, text, done) {
+    var pill = document.getElementById("labStatus" + prefix);
+    if (!pill) return;
+    pill.textContent = text;
+    pill.classList.toggle("done", Boolean(done));
+}
+
+function showLabImagesPrefix(prefix, images) {
+    var box = document.getElementById("labImages" + prefix);
+    if (!box) return;
+    box.innerHTML = "";
+    images.forEach(function (src) {
+        var img = document.createElement("img");
+        img.src = src;
+        img.alt = "Figure produced by the Python lab";
+        box.appendChild(img);
+    });
+}
+
+function labCopy(prefix) {
+    var editor = document.getElementById("labEditor" + prefix);
+    if (!editor || !editor.value.trim()) { toast("There is no code in the editor yet."); return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(editor.value).then(function () { toast("Code copied!"); }).catch(function () { toast("Copy failed - select manually."); });
+    } else {
+        toast("Copy unavailable - select the code manually.");
+    }
+}
+
+function labFill(prefix, mode) {
+    var editor = document.getElementById("labEditor" + prefix);
+    if (!editor) return;
+    if (!labState[prefix]) labState[prefix] = { starter: LAB_BLANK, draft: null };
+
+    if (mode === "blank") {
+        if (!window.confirm("Replace the editor content with a blank template?")) return;
+        editor.value = LAB_BLANK;
+    } else {
+        editor.value = labState[prefix].starter || LAB_BLANK;
+    }
+    labState[prefix].draft = editor.value;
+    labSyncGutterNow(prefix);
+    labClear(prefix);
+    var out = document.getElementById("labOut" + prefix);
+    if (out) out.textContent = "Press RUN CODE to execute this file.";
+    var images = document.getElementById("labImages" + prefix);
+    if (images) images.innerHTML = "";
+    editor.focus();
+    toast("Editor loaded - change anything you like and press RUN CODE.");
+}
+
+function labClear(prefix) {
+    var out = document.getElementById("labOut" + prefix);
+    if (out) { out.textContent = ""; out.classList.remove("error"); }
+    var images = document.getElementById("labImages" + prefix);
+    if (images) images.innerHTML = "";
+}
+
+function labMatplotlib(prefix, button) {
+    if (button) button.disabled = true;
+    setLabStatusPrefix(prefix, "loading matplotlib\u2026", false);
+    ensurePython().then(function (py) {
+        return py.loadPackage("matplotlib");
+    }).then(function () {
+        setLabStatusPrefix(prefix, pyPythonTag + " matplotlib ready", true);
+        writeLabOutputPrefix(prefix, "matplotlib is ready. Example:\n\n" +
+            "import base64\nimport matplotlib.pyplot as plt\n\n" +
+            "plt.bar(['A','B','C'], [3, 5, 2])\n" +
+            "plt.savefig('fig.png')\n" +
+            "print('DATA:image/png;base64,' + base64.b64encode(open('fig.png','rb').read()).decode())\n", false);
+    }).catch(function () {
+        setLabStatusPrefix(prefix, "matplotlib unavailable", false);
+        writeLabOutputPrefix(prefix, "matplotlib could not be downloaded.", true);
+    }).then(function () {
+        if (button) button.disabled = false;
+    });
+}
+
+
+/* =========================================================
+   13. INITIALISATION
    ========================================================= */
 document.addEventListener("DOMContentLoaded", function () {
 
-    /* search - filters while the user types */
-    const search = document.getElementById("search");
-    if (search) {
-        search.addEventListener("input", function () {
-            render(search.value);
-        });
-        search.addEventListener("keydown", function (event) {
-            if (event.key === "Escape" && search.value) {
-                search.value = "";
-                render("");
-            }
-        });
-    }
-
-    /* add experiment - placeholder for now */
-    const addButton = document.getElementById("addExperiment");
-    if (addButton) {
-        addButton.addEventListener("click", function () {
-            toast("Add Experiment form placeholder - new experiments are added inside script.js.");
-        });
-    }
-
-    /* modal close button */
-    const closeButton = document.getElementById("closeModal");
-    if (closeButton) {
-        closeButton.addEventListener("click", closeModal);
-    }
-
-    /* click outside the modal card closes it */
-    const modal = document.getElementById("modal");
-    if (modal) {
-        modal.addEventListener("click", function (event) {
-            if (event.target === modal) closeModal();
-        });
-    }
-
-    /* escape key closes the modal */
-    document.addEventListener("keydown", function (event) {
-        if (event.key === "Escape" || event.key === "Esc") closeModal();
-    });
-
-    /* HOME / MODULES / TOOLS navigation */
+    /* main navigation */
     document.querySelectorAll(".nav-btn").forEach(function (btn) {
         btn.addEventListener("click", function () {
-            showPage(btn.dataset.page);
+            go("/" + btn.dataset.page);
         });
     });
 
-    /* first paint of the three pages */
-    renderModules();
-    renderTools();
-    showPage("home");
-    render();
+    /* back bar (full screen views) */
+    var viewBack = document.getElementById("viewBack");
+    if (viewBack) viewBack.addEventListener("click", function () {
+        var back = document.getElementById("view").getAttribute("data-back") || "";
+        if (back) go(back);
+        else history.back();
+    });
 
+    /* search boxes */
+    var search = document.getElementById("search");
+    if (search) {
+        search.addEventListener("input", function () { render(search.value); });
+    }
+
+    var expSearch = document.getElementById("expSearch");
+    if (expSearch) {
+        expSearch.addEventListener("input", function () { renderCards("expGrid", "expEmpty", expSearch.value); });
+    }
+
+    /* add experiment placeholder moved to the experiments page */
+    var addButton = document.getElementById("addExperiment");
+    if (addButton) addButton.addEventListener("click", function () {
+        toast("Add Experiment form placeholder - new experiments are added inside script.js.");
+    });
+
+    /* the Backspace/Esc close keys are gone (no modal); keep ESC navigating back */
+    document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && document.getElementById("view") && !document.getElementById("view").hidden) {
+            var back = document.getElementById("view").getAttribute("data-back") || "/home";
+            if (back) go(back);
+        }
+    });
+
+    renderModules();
+    renderProjects();
+    renderResources();
+    renderTools();
+    renderExperimentsLab();
+    renderCards("expGrid", "expEmpty", "");
+    if (typeof render === "function") render();
+
+    window.addEventListener("hashchange", renderRoute);
+    if (!location.hash) location.hash = "#/home";
+    renderRoute();
 });
