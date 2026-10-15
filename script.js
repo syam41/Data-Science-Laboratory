@@ -4336,7 +4336,7 @@ function openOverview(experimentId) {
     const subButtons = subs.map(function (key) {
         const sub = (subData[exp.id] || {})[key] || {};
         return "" +
-            '<button type="button" class="sub-btn" onclick="go(\'/sub/' + Number(exp.id) + ", '" + escapeHtml(key) + "')" + '">' +
+            '<button type="button" class="sub-btn" onclick="go(\'/sub/' + Number(exp.id) + '/' + escapeHtml(key) + '\')">' +
             '   <span class="sub-key">' + escapeHtml(key) + "</span>" +
             '   <span class="sub-name">' + escapeHtml(sub.name || key) + "</span>" +
             (sub.label ? '   <span class="sub-label">' + escapeHtml(sub.label) + "</span>" : "") +
@@ -4519,7 +4519,7 @@ function openSub(experimentId, subKey) {
         "               when you want an empty editor with templates.</p>" +
         "       </div>" +
         '       <div class="lab-cta-buttons">' +
-        '           <button type="button" class="btn-lab-open" onclick="labOpenSub(' + eid + ", '" + escapeHtml(subKey) + "')" + '>' +
+        '           <button type="button" class="btn-lab-open" onclick="labOpenSub(' + eid + ", '" + escapeHtml(subKey) + '\')">' +
         "               TRY IT YOURSELF" +
         "           </button>" +
         '           <button type="button" class="btn-lab-ghost" onclick="go(\'/lab\')">Open the lab page</button>' +
